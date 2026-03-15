@@ -1,11 +1,28 @@
 import { app, session } from "electron";
+import { settings } from "./settings.js";
 
-// Only inject headers for local instances (Docker on localhost).
-// Remote instances (e.g. penpot.app) already send correct COOP/COEP headers
-// from the server; applying them to arbitrary remote origins could break
-// cross-origin asset loading if those origins lack CORP headers on their
-// sub-resources.
-const LOCAL_INSTANCE_URLS = ["http://localhost/*", "http://127.0.0.1/*"];
+// Well-known remote instances that already serve correct COOP/COEP headers
+// from the server.  We skip these to avoid breaking cross-origin asset
+// loading if their sub-resources lack CORP headers.
+const REMOTE_ORIGINS_WITH_HEADERS = new Set(["https://penpot.app"]);
+
+/**
+ * Build the URL filter list for `webRequest.onHeadersReceived`.
+ *
+ * Includes localhost plus any user-configured self-hosted instance origins
+ * that are not in the known-good remote set.
+ */
+function getInstanceUrlFilters() {
+	const urls = ["http://localhost/*", "http://127.0.0.1/*"];
+
+	for (const { origin } of settings.instances) {
+		if (!REMOTE_ORIGINS_WITH_HEADERS.has(origin)) {
+			urls.push(`${origin}/*`);
+		}
+	}
+
+	return [...new Set(urls)];
+}
 
 /**
  * Sets up performance-related HTTP response header modifications for all
@@ -38,13 +55,13 @@ export function setupPerformanceHeaders() {
 /**
  * Attaches a `webRequest.onHeadersReceived` handler to the given session that
  * injects COOP and COEP headers into HTML document responses served from
- * localhost.
+ * local or self-hosted Penpot instances.
  *
  * @param {import("electron").Session} targetSession
  */
 function applyHeadersToSession(targetSession) {
 	targetSession.webRequest.onHeadersReceived(
-		{ urls: LOCAL_INSTANCE_URLS },
+		{ urls: getInstanceUrlFilters() },
 		(details, callback) => {
 			const responseHeaders = { ...details.responseHeaders };
 

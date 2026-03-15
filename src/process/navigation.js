@@ -137,6 +137,14 @@ app.on("web-contents-created", (event, contents) => {
 		webPreferences.sandbox = true;
 		webPreferences.webSecurity = true;
 
+		// ── Performance ──────────────────────────────────────────────
+		// Prevent Chromium from throttling inactive webview tabs so that
+		// switching back to a Penpot tab does not feel sluggish.
+		webPreferences.backgroundThrottling = false;
+		// Design tools do not need spell-checking; disabling it removes
+		// the synchronous dictionary lookup on every text input.
+		webPreferences.spellcheck = false;
+
 		const allowedPreloadScriptPath = join(
 			app.getAppPath(),
 			"src/base/scripts/webviews/preload.mjs",

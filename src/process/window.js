@@ -52,7 +52,7 @@ export const MainWindow = {
 			height: mainWindowState.height,
 			minWidth: 1000,
 			minHeight: 400,
-			transparent: global.transparent,
+			transparent: false,
 			vibrancy: "sidebar",
 			// Titlebar
 			trafficLightPosition: { x: 16, y: 12 }, // for macOS

@@ -12,6 +12,10 @@ await import("./diagnostics.js");
 app.enableSandbox();
 
 // ── GPU Rasterization ──────────────────────────────────────────────────────
+// Override Chromium's GPU blocklist so that all GPU optimisation flags below
+// take effect even on hardware that Chromium would otherwise blacklist.
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+
 // Force GPU rasterization for Canvas 2D operations.  Penpot relies heavily on
 // Canvas 2D for its design canvas, so moving rasterization off the CPU and
 // onto the GPU has a direct impact on frame rate when scrolling, zooming, or
@@ -21,6 +25,10 @@ app.commandLine.appendSwitch("enable-gpu-rasterization");
 // Reduce the CPU↔GPU data-copy overhead during texture uploads.
 app.commandLine.appendSwitch("enable-zero-copy");
 
+// Use platform-native GPU memory buffers (IOSurface on macOS, DXGI on Windows)
+// to further reduce CPU↔GPU data copies in conjunction with zero-copy above.
+app.commandLine.appendSwitch("enable-native-gpu-memory-buffers");
+
 // Ensure hardware-accelerated 2D canvas is active even on machines where
 // Chromium's GPU blocklist would otherwise disable it.
 app.commandLine.appendSwitch("enable-accelerated-2d-canvas");
@@ -28,6 +36,10 @@ app.commandLine.appendSwitch("enable-accelerated-2d-canvas");
 // Move canvas rasterization into a dedicated GPU process so it cannot block
 // the main renderer thread.
 app.commandLine.appendSwitch("enable-features", "CanvasOopRasterization");
+
+// Remove the 60 fps cap so that high-refresh-rate displays (120 Hz / 144 Hz)
+// can render Penpot's canvas at their native refresh rate.
+app.commandLine.appendSwitch("disable-frame-rate-limit");
 
 // ── Platform-specific Rendering Backend ───────────────────────────────────
 // Explicitly request the most capable native GPU API for the platform.
@@ -39,6 +51,23 @@ if (isMacOs()) {
 } else if (isWindows()) {
 	// D3D11 outperforms the legacy D3D9 back-end on every modern Windows GPU.
 	app.commandLine.appendSwitch("use-angle", "d3d11");
+}
+
+// ── V8 Heap ──────────────────────────────────────────────────────────────
+// Penpot's ClojureScript runtime and WASM renderer can consume significant
+// memory on large design files.  Raise the V8 old-generation heap limit from
+// the default (~1.7 GB) to 4 GB to reduce GC pressure and avoid OOM crashes.
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=4096");
+
+// ── Windows Occlusion ────────────────────────────────────────────────────
+// On Windows, Chromium detects when a window is fully occluded by other
+// windows and deprioritises its renderer.  Combined with the background-
+// throttling switches below this ensures the renderer stays at full speed.
+if (isWindows()) {
+	app.commandLine.appendSwitch(
+		"disable-features",
+		"CalculateNativeWinOcclusion",
+	);
 }
 
 // ── Prevent Background Throttling ─────────────────────────────────────────
