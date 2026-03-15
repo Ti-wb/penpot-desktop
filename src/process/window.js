@@ -67,6 +67,11 @@ export const MainWindow = {
 			webPreferences: {
 				preload: path.join(app.getAppPath(), "src/process/preload.mjs"),
 				webviewTag: true,
+				// Keep the shell UI renderer running at full speed when the
+				// window loses focus or is minimised.  This prevents autosave
+				// timers and IPC handlers from being slowed down by Chromium's
+				// background throttling.
+				backgroundThrottling: false,
 			},
 		});
 		mainWindow.loadFile(path.join(app.getAppPath(), "src/base/index.html"));
