@@ -1,6 +1,9 @@
 ![Penpot Desktop](./penpot-desktop-banner.png)
 
-# Penpot Desktop
+# Penpot Desktop (Fork)
+
+> **This is a personal fork of [penpot-desktop](https://github.com/author-more/penpot-desktop) by [author-more](https://github.com/author-more).**
+> All credits go to the original authors. This fork focuses on minor performance tuning and UX improvements for personal use. Mature changes will be contributed back upstream.
 
 Penpot Desktop is an unofficial desktop application for the open-source design tool, Penpot.
 
