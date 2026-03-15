@@ -6,22 +6,32 @@ import { settings } from "./settings.js";
 // loading if their sub-resources lack CORP headers.
 const REMOTE_ORIGINS_WITH_HEADERS = new Set(["https://penpot.app"]);
 
-/**
- * Build the URL filter list for `webRequest.onHeadersReceived`.
- *
- * Includes localhost plus any user-configured self-hosted instance origins
- * that are not in the known-good remote set.
- */
-function getInstanceUrlFilters() {
-	const urls = ["http://localhost/*", "http://127.0.0.1/*"];
+const LOCAL_ORIGINS = new Set(["http://localhost", "http://127.0.0.1"]);
 
-	for (const { origin } of settings.instances) {
-		if (!REMOTE_ORIGINS_WITH_HEADERS.has(origin)) {
-			urls.push(`${origin}/*`);
-		}
+/**
+ * Check whether a request URL belongs to an instance that needs injected
+ * COOP/COEP headers.  Evaluated on every response so that it stays in sync
+ * when users add, remove, or change instance origins at runtime.
+ *
+ * @param {string} url
+ */
+function needsHeaderInjection(url) {
+	let origin;
+	try {
+		origin = new URL(url).origin;
+	} catch {
+		return false;
 	}
 
-	return [...new Set(urls)];
+	if (REMOTE_ORIGINS_WITH_HEADERS.has(origin)) {
+		return false;
+	}
+
+	if (LOCAL_ORIGINS.has(origin)) {
+		return true;
+	}
+
+	return settings.instances.some((instance) => instance.origin === origin);
 }
 
 /**
@@ -60,25 +70,26 @@ export function setupPerformanceHeaders() {
  * @param {import("electron").Session} targetSession
  */
 function applyHeadersToSession(targetSession) {
-	targetSession.webRequest.onHeadersReceived(
-		{ urls: getInstanceUrlFilters() },
-		(details, callback) => {
-			const responseHeaders = { ...details.responseHeaders };
+	targetSession.webRequest.onHeadersReceived((details, callback) => {
+		if (!needsHeaderInjection(details.url)) {
+			return callback({});
+		}
 
-			// Header names in Electron's webRequest are case-sensitive and
-			// may be lowercase depending on the server.  Check both casings.
-			const contentType =
-				responseHeaders["content-type"]?.[0] ??
-				responseHeaders["Content-Type"]?.[0] ??
-				"";
-			const isHtmlDocument = contentType.includes("text/html");
+		const responseHeaders = { ...details.responseHeaders };
 
-			if (isHtmlDocument) {
-				responseHeaders["Cross-Origin-Opener-Policy"] = ["same-origin"];
-				responseHeaders["Cross-Origin-Embedder-Policy"] = ["require-corp"];
-			}
+		// Header names in Electron's webRequest are case-sensitive and
+		// may be lowercase depending on the server.  Check both casings.
+		const contentType =
+			responseHeaders["content-type"]?.[0] ??
+			responseHeaders["Content-Type"]?.[0] ??
+			"";
+		const isHtmlDocument = contentType.includes("text/html");
 
-			callback({ responseHeaders });
-		},
-	);
+		if (isHtmlDocument) {
+			responseHeaders["Cross-Origin-Opener-Policy"] = ["same-origin"];
+			responseHeaders["Cross-Origin-Embedder-Policy"] = ["require-corp"];
+		}
+
+		callback({ responseHeaders });
+	});
 }
