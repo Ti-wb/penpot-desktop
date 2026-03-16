@@ -1,11 +1,41 @@
 import { app, session } from "electron";
+import { settings } from "./settings.js";
 
-// Only inject headers for local instances (Docker on localhost).
-// Remote instances (e.g. penpot.app) already send correct COOP/COEP headers
-// from the server; applying them to arbitrary remote origins could break
-// cross-origin asset loading if those origins lack CORP headers on their
-// sub-resources.
-const LOCAL_INSTANCE_URLS = ["http://localhost/*", "http://127.0.0.1/*"];
+// Well-known remote instances that already serve correct COOP/COEP headers
+// from the server.  We skip these to avoid breaking cross-origin asset
+// loading if their sub-resources lack CORP headers.
+const REMOTE_ORIGINS_WITH_HEADERS = new Set([
+	"https://penpot.app",
+	"https://design.penpot.app",
+]);
+
+const LOCAL_ORIGINS = new Set(["http://localhost", "http://127.0.0.1"]);
+
+/**
+ * Check whether a request URL belongs to an instance that needs injected
+ * COOP/COEP headers.  Evaluated on every response so that it stays in sync
+ * when users add, remove, or change instance origins at runtime.
+ *
+ * @param {string} url
+ */
+function needsHeaderInjection(url) {
+	let origin;
+	try {
+		origin = new URL(url).origin;
+	} catch {
+		return false;
+	}
+
+	if (REMOTE_ORIGINS_WITH_HEADERS.has(origin)) {
+		return false;
+	}
+
+	if (LOCAL_ORIGINS.has(origin)) {
+		return true;
+	}
+
+	return settings.instances.some((instance) => instance.origin === origin);
+}
 
 /**
  * Sets up performance-related HTTP response header modifications for all
@@ -38,30 +68,31 @@ export function setupPerformanceHeaders() {
 /**
  * Attaches a `webRequest.onHeadersReceived` handler to the given session that
  * injects COOP and COEP headers into HTML document responses served from
- * localhost.
+ * local or self-hosted Penpot instances.
  *
  * @param {import("electron").Session} targetSession
  */
 function applyHeadersToSession(targetSession) {
-	targetSession.webRequest.onHeadersReceived(
-		{ urls: LOCAL_INSTANCE_URLS },
-		(details, callback) => {
-			const responseHeaders = { ...details.responseHeaders };
+	targetSession.webRequest.onHeadersReceived((details, callback) => {
+		if (!needsHeaderInjection(details.url)) {
+			return callback({});
+		}
 
-			// Header names in Electron's webRequest are case-sensitive and
-			// may be lowercase depending on the server.  Check both casings.
-			const contentType =
-				responseHeaders["content-type"]?.[0] ??
-				responseHeaders["Content-Type"]?.[0] ??
-				"";
-			const isHtmlDocument = contentType.includes("text/html");
+		const responseHeaders = { ...details.responseHeaders };
 
-			if (isHtmlDocument) {
-				responseHeaders["Cross-Origin-Opener-Policy"] = ["same-origin"];
-				responseHeaders["Cross-Origin-Embedder-Policy"] = ["require-corp"];
-			}
+		// Header names in Electron's webRequest are case-sensitive and
+		// may be lowercase depending on the server.  Check both casings.
+		const contentType =
+			responseHeaders["content-type"]?.[0] ??
+			responseHeaders["Content-Type"]?.[0] ??
+			"";
+		const isHtmlDocument = contentType.includes("text/html");
 
-			callback({ responseHeaders });
-		},
-	);
+		if (isHtmlDocument) {
+			responseHeaders["Cross-Origin-Opener-Policy"] = ["same-origin"];
+			responseHeaders["Cross-Origin-Embedder-Policy"] = ["require-corp"];
+		}
+
+		callback({ responseHeaders });
+	});
 }

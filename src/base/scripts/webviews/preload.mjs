@@ -87,33 +87,17 @@ function UpdateTitle() {
 	}
 }
 
-window.onload = function () {
-	var titleEl = document.getElementsByTagName("title")[0];
-	var docEl = document.documentElement;
-
-	if (docEl && docEl.addEventListener) {
-		docEl.addEventListener(
-			"DOMSubtreeModified",
-			function (evt) {
-				var t = evt.target;
-				if (t === titleEl || (t.parentNode && t.parentNode === titleEl)) {
-					setTimeout(() => {
-						UpdateTitle();
-					}, 1200);
-				}
-			},
-			false,
-		);
-	} else {
-		document.onpropertychange = function () {
-			if (window.event.propertyName == "title") {
-				setTimeout(() => {
-					UpdateTitle();
-				}, 1200);
-			}
-		};
+// Observe <title> changes with a MutationObserver instead of the deprecated
+// DOMSubtreeModified event, which fires on *every* DOM mutation in the entire
+// document tree and is a significant performance bottleneck for Penpot.
+window.addEventListener("DOMContentLoaded", () => {
+	const titleEl = document.querySelector("title");
+	if (titleEl) {
+		new MutationObserver(() => {
+			setTimeout(() => UpdateTitle(), 1200);
+		}).observe(titleEl, { childList: true });
 	}
-};
+});
 
 window.addEventListener("DOMContentLoaded", () => {
 	onClassChange(document.body, () => dispatchThemeUpdate());
