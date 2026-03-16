@@ -4,7 +4,10 @@ import { settings } from "./settings.js";
 // Well-known remote instances that already serve correct COOP/COEP headers
 // from the server.  We skip these to avoid breaking cross-origin asset
 // loading if their sub-resources lack CORP headers.
-const REMOTE_ORIGINS_WITH_HEADERS = new Set(["https://penpot.app"]);
+const REMOTE_ORIGINS_WITH_HEADERS = new Set([
+	"https://penpot.app",
+	"https://design.penpot.app",
+]);
 
 const LOCAL_ORIGINS = new Set(["http://localhost", "http://127.0.0.1"]);
 
