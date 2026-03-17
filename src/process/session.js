@@ -36,9 +36,10 @@ function needsHeaderInjection(url) {
 
 	return settings.instances.some((instance) => {
 		try {
-			return new URL(instance.origin).origin === origin;
+			const parsed = new URL(instance.origin).origin;
+			return parsed !== "null" && parsed === origin;
 		} catch {
-			return instance.origin === origin;
+			return false;
 		}
 	});
 }

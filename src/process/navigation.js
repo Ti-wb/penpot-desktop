@@ -219,12 +219,15 @@ function showNavigationQuestion(url, { buttons, onCancel, onAllow, logLabel }) {
  */
 function getUserInstanceOrigins(settings) {
 	return new Set(
-		settings.instances.map(({ origin }) => {
-			try {
-				return new URL(origin).origin;
-			} catch {
-				return origin;
-			}
-		}),
+		settings.instances
+			.map(({ origin }) => {
+				try {
+					const parsed = new URL(origin).origin;
+					return parsed !== "null" ? parsed : null;
+				} catch {
+					return null;
+				}
+			})
+			.filter((origin) => origin !== null),
 	);
 }

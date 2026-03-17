@@ -308,9 +308,19 @@ function registerInstance(instance) {
 	if (hasValidOrigin) {
 		// Normalize to a proper origin (scheme + host + port, no path/trailing slash)
 		// so that comparisons against URL.origin always match.
+		const parsed = new URL(origin).origin;
+
+		// Opaque origins (file:///, custom schemes) resolve to "null" — reject them.
+		if (parsed === "null") {
+			console.warn(
+				`[WARN] [IPC.${INSTANCE_EVENTS.REGISTER}] Opaque origin rejected: ${origin}`,
+			);
+			return;
+		}
+
 		const normalizedInstance = {
 			...instance,
-			origin: new URL(origin).origin,
+			origin: parsed,
 		};
 
 		const instanceIndex = settings.instances.findIndex(
