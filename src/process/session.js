@@ -34,7 +34,14 @@ function needsHeaderInjection(url) {
 		return true;
 	}
 
-	return settings.instances.some((instance) => instance.origin === origin);
+	return settings.instances.some((instance) => {
+		try {
+			const parsed = new URL(instance.origin).origin;
+			return parsed !== "null" && parsed === origin;
+		} catch {
+			return false;
+		}
+	});
 }
 
 /**
