@@ -34,7 +34,13 @@ function needsHeaderInjection(url) {
 		return true;
 	}
 
-	return settings.instances.some((instance) => instance.origin === origin);
+	return settings.instances.some((instance) => {
+		try {
+			return new URL(instance.origin).origin === origin;
+		} catch {
+			return instance.origin === origin;
+		}
+	});
 }
 
 /**

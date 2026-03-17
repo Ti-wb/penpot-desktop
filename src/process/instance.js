@@ -306,6 +306,13 @@ function registerInstance(instance) {
 	const { id, origin } = instance;
 	const hasValidOrigin = URL.canParse(origin);
 	if (hasValidOrigin) {
+		// Normalize to a proper origin (scheme + host + port, no path/trailing slash)
+		// so that comparisons against URL.origin always match.
+		const normalizedInstance = {
+			...instance,
+			origin: new URL(origin).origin,
+		};
+
 		const instanceIndex = settings.instances.findIndex(
 			({ id: registeredId }) => registeredId === id,
 		);
@@ -313,12 +320,12 @@ function registerInstance(instance) {
 			settings.instances = settings.instances.toSpliced(
 				instanceIndex,
 				1,
-				instance,
+				normalizedInstance,
 			);
 			return;
 		}
 
-		settings.instances = [...settings.instances, instance];
+		settings.instances = [...settings.instances, normalizedInstance];
 	} else {
 		console.warn(
 			`[WARN] [IPC.${INSTANCE_EVENTS.REGISTER}] Failed with: ${origin}`,
